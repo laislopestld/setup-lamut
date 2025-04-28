@@ -1,0 +1,125 @@
+#!/bin/bash
+set -euo pipefail
+
+# Atualizar sistema e instalar docker/docker-compose
+echo "Atualizando pacotes e instalando Docker..."
+apt update && apt upgrade -y
+apt install -y docker.io docker-compose curl ufw
+
+# Habilitar e iniciar docker
+systemctl enable docker
+systemctl start docker
+
+# Criar rede docker isolada
+echo "Criando rede Docker segura: orion_network"
+docker network create orion_network || true
+
+# Criar estrutura de diretórios
+mkdir -p /opt/orion/{n8n,grafana,traefik,portainer,evolution}
+
+# Definir variáveis comuns
+DOMAIN="seuservidor.exemplo.com"
+EMAIL="seu-email@exemplo.com"
+
+# Gerar docker-compose básico
+cat <<EOF > /opt/orion/docker-compose.yml
+version: "3.8"
+services:
+  traefik:
+    image: traefik:v2.10
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.le.acme.tlschallenge=true"
+      - "--certificatesresolvers.le.acme.email=${EMAIL}"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./traefik:/letsencrypt"
+    networks:
+      - orion_network
+
+  n8n:
+    image: n8nio/n8n:latest
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=n8nuser
+      - N8N_BASIC_AUTH_PASSWORD=senhaforte
+      - WEBHOOK_URL=https://${DOMAIN}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.n8n.rule=Host(\`n8n.${DOMAIN}\`)"
+      - "traefik.http.routers.n8n.entrypoints=websecure"
+      - "traefik.http.routers.n8n.tls.certresolver=le"
+    networks:
+      - orion_network
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=senha_forte
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(\`grafana.${DOMAIN}\`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls.certresolver=le"
+    networks:
+      - orion_network
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    command: -H unix:///var/run/docker.sock
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer.rule=Host(\`portainer.${DOMAIN}\`)"
+      - "traefik.http.routers.portainer.entrypoints=websecure"
+      - "traefik.http.routers.portainer.tls.certresolver=le"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./portainer:/data"
+    networks:
+      - orion_network
+
+  evolution-api:
+    image: ghcr.io/killov/evolution-api:latest
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.evolution.rule=Host(\`evolution.${DOMAIN}\`)"
+      - "traefik.http.routers.evolution.entrypoints=websecure"
+      - "traefik.http.routers.evolution.tls.certresolver=le"
+    networks:
+      - orion_network
+
+networks:
+  orion_network:
+    external: true
+EOF
+
+# Configurar permissões seguras para o Traefik (certificados)
+mkdir -p /opt/orion/traefik
+touch /opt/orion/traefik/acme.json
+chmod 600 /opt/orion/traefik/acme.json
+
+# Firewall básico
+echo "Configurando UFW para abrir apenas SSH, HTTP e HTTPS..."
+ufw allow OpenSSH
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw --force enable
+
+# Finalizar
+echo "Subindo containers..."
+cd /opt/orion
+docker-compose up -d
+
+echo "Tudo configurado! Acesse seus serviços:"
+echo "- n8n: https://n8n.${DOMAIN}"
+echo "- Grafana: https://grafana.${DOMAIN}"
+echo "- Portainer: https://portainer.${DOMAIN}"
+echo "- Evolution API: https://evolution.${DOMAIN}"

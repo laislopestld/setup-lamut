@@ -1,0 +1,178 @@
+#!/bin/bash
+
+echo ""
+echo "#########################################"
+echo " Script desenvolvido pela Lamut - www.lamut.com.br"
+echo "#########################################"
+echo ""
+
+# Atualizar pacotes e instalar Docker + Docker Compose
+apt update -y && apt upgrade -y
+apt install -y curl wget ufw sudo git docker.io docker-compose
+
+# Ativar e configurar o Firewall
+ufw allow OpenSSH
+ufw allow 80
+ufw allow 443
+ufw --force enable
+
+# Configurar timezone
+timedatectl set-timezone America/Sao_Paulo
+
+# Criar diretório base
+mkdir -p /opt/lamut
+cd /opt/lamut
+
+# Coletar informações interativas
+echo ""
+read -p "Digite seu domínio principal (ex: seudominio.com): " DOMAIN
+read -p "Digite seu e-mail para Let's Encrypt SSL: " EMAIL
+
+echo ""
+echo "Usuário e senha para N8N:"
+read -p "Usuário N8N: " N8N_USER
+read -sp "Senha N8N: " N8N_PASS
+echo ""
+
+echo ""
+echo "Usuário e senha para Grafana:"
+read -p "Usuário Grafana: " GRAFANA_USER
+read -sp "Senha Grafana: " GRAFANA_PASS
+echo ""
+
+echo ""
+echo "Usuário e senha para Portainer:"
+read -p "Usuário Portainer: " PORTAINER_USER
+read -sp "Senha Portainer: " PORTAINER_PASS
+echo ""
+
+echo ""
+echo "Quais aplicações você deseja instalar? (escolha números separados por espaço)"
+echo "1 - Traefik (obrigatório)"
+echo "2 - Chatwoot"
+echo "3 - Evolution API"
+echo "4 - Typebot"
+echo "5 - N8N"
+echo "6 - Flowise AI"
+echo "7 - Botpress"
+echo "8 - Baserow"
+echo "9 - MongoDB"
+echo "10 - Supabase"
+echo "11 - AppSmith"
+read -p "Digite os números (ex: 1 3 5 9): " APPS
+
+# Criar o docker-compose.yml
+cat <<EOF > /opt/lamut/docker-compose.yml
+version: '3.9'
+services:
+EOF
+
+# Sempre incluir Traefik
+cat <<EOF >> /opt/lamut/docker-compose.yml
+  traefik:
+    image: traefik:v2.10
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.email=$EMAIL"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./letsencrypt:/letsencrypt"
+    restart: unless-stopped
+EOF
+
+# Função para adicionar serviços escolhidos
+function add_service() {
+    case $1 in
+        2)
+            echo "Adicionando Chatwoot..."
+            mkdir -p /opt/lamut/chatwoot
+            # Configuração Chatwoot
+            ;;
+        3)
+            echo "Adicionando Evolution API..."
+            mkdir -p /opt/lamut/evolution-api
+            cd /opt/lamut/evolution-api
+            git clone https://github.com/EvolutionAPI/evolution-api.git .
+            cp .env.example .env
+            cd /opt/lamut
+            cat <<EOF >> /opt/lamut/docker-compose.yml
+  evolution-api:
+    build: ./evolution-api
+    container_name: evolution-api
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+EOF
+            ;;
+        4)
+            echo "Adicionando Typebot..."
+            mkdir -p /opt/lamut/typebot
+            ;;
+        5)
+            echo "Adicionando n8n..."
+            mkdir -p /opt/lamut/n8n
+            cat <<EOF >> /opt/lamut/docker-compose.yml
+  n8n:
+    image: n8nio/n8n
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=$N8N_USER
+      - N8N_BASIC_AUTH_PASSWORD=$N8N_PASS
+      - WEBHOOK_TUNNEL_URL=https://n8n.$DOMAIN
+    ports:
+      - "5678:5678"
+    restart: unless-stopped
+EOF
+            ;;
+        6)
+            echo "Adicionando Flowise AI..."
+            mkdir -p /opt/lamut/flowise
+            ;;
+        7)
+            echo "Adicionando Botpress..."
+            mkdir -p /opt/lamut/botpress
+            ;;
+        8)
+            echo "Adicionando Baserow..."
+            mkdir -p /opt/lamut/baserow
+            ;;
+        9)
+            echo "Adicionando MongoDB..."
+            mkdir -p /opt/lamut/mongodb
+            ;;
+        10)
+            echo "Adicionando Supabase..."
+            mkdir -p /opt/lamut/supabase
+            ;;
+        11)
+            echo "Adicionando AppSmith..."
+            mkdir -p /opt/lamut/appsmith
+            ;;
+        *)
+            echo "Opção inválida ou já tratada."
+            ;;
+    esac
+}
+
+# Ler opções escolhidas
+for app in $APPS; do
+  add_service $app
+done
+
+# Subir stack
+docker-compose up -d --build
+
+echo ""
+echo "#########################################"
+echo "Instalação finalizada!"
+echo "Acesse suas aplicações pelos subdomínios configurados."
+echo "Script desenvolvido pela Lamut - www.lamut.com.br"
+echo "#########################################"

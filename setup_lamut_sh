@@ -1,5 +1,6 @@
 #!/bin/bash
 
+<<<<<<< HEAD
 echo ""
 echo "#########################################"
 echo " Script desenvolvido pela Lamut - www.lamut.com.br"
@@ -71,20 +72,57 @@ EOF
 cat <<EOF >> /opt/lamut/docker-compose.yml
   traefik:
     image: traefik:v2.10
+=======
+# Função para exibir o banner
+exibir_banner() {
+    clear
+    echo "==============================================="
+    echo "       LAMUT - Instalador de Aplicações        "
+    echo "==============================================="
+    echo ""
+}
+
+# Função para instalar Traefik + Portainer
+instalar_traefik_portainer() {
+    read -p "Informe o domínio para Traefik (ex: traefik.seudominio.com): " dominio_traefik
+    read -p "Informe o e-mail para Let's Encrypt: " email_traefik
+
+    echo "Instalando Traefik + Portainer..."
+
+    # Criar diretório para Traefik
+    mkdir -p ~/traefik
+    cd ~/traefik
+
+    # Criar arquivo docker-compose.yml
+    cat > docker-compose.yml <<EOF
+version: '3'
+
+services:
+  traefik:
+    image: traefik:v2.5
+>>>>>>> fdd2f7a (Versão inicial após reinstalação)
     command:
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+<<<<<<< HEAD
       - "--certificatesresolvers.myresolver.acme.email=$EMAIL"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
       - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+=======
+      - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.myresolver.acme.email=$email_traefik"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+>>>>>>> fdd2f7a (Versão inicial após reinstalação)
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "./letsencrypt:/letsencrypt"
+<<<<<<< HEAD
     restart: unless-stopped
 EOF
 
@@ -176,3 +214,152 @@ echo "Instalação finalizada!"
 echo "Acesse suas aplicações pelos subdomínios configurados."
 echo "Script desenvolvido pela Lamut - www.lamut.com.br"
 echo "#########################################"
+=======
+    labels:
+      - "traefik.http.routers.api.rule=Host(\`$dominio_traefik\`)"
+      - "traefik.http.routers.api.service=api@internal"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=myresolver"
+
+  portainer:
+    image: portainer/portainer-ce
+    command: -H unix:///var/run/docker.sock
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "portainer_data:/data"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer.rule=Host(\`portainer.$dominio_traefik\`)"
+      - "traefik.http.routers.portainer.entrypoints=websecure"
+      - "traefik.http.routers.portainer.tls.certresolver=myresolver"
+
+volumes:
+  portainer_data:
+EOF
+
+    # Criar diretório para certificados
+    mkdir -p ~/traefik/letsencrypt
+    touch ~/traefik/letsencrypt/acme.json
+    chmod 600 ~/traefik/letsencrypt/acme.json
+
+    # Iniciar os containers
+    docker-compose up -d
+
+    echo "Traefik e Portainer instalados com sucesso!"
+    echo "Acesse Traefik: https://$dominio_traefik"
+    echo "Acesse Portainer: https://portainer.$dominio_traefik"
+}
+
+# Função para instalar Chatwoot
+instalar_chatwoot() {
+    read -p "Informe o domínio para o Chatwoot (ex: chat.seudominio.com): " dominio_chatwoot
+    read -p "Informe o e-mail do administrador: " email_admin
+    read -p "Informe a senha do administrador: " senha_admin
+    read -p "Informe o nome da empresa: " nome_empresa
+
+    echo "Instalando Chatwoot..."
+
+    # Criar diretório para Chatwoot
+    mkdir -p ~/chatwoot
+    cd ~/chatwoot
+
+    # Criar arquivo docker-compose.yml
+    cat > docker-compose.yml <<EOF
+version: '3'
+
+services:
+  chatwoot:
+    image: chatwoot/chatwoot
+    environment:
+      - "FRONTEND_URL=https://$dominio_chatwoot"
+      - "ADMIN_EMAIL=$email_admin"
+      - "ADMIN_PASSWORD=$senha_admin"
+      - "ACCOUNT_NAME=$nome_empresa"
+    ports:
+      - "3000:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.chatwoot.rule=Host(\`$dominio_chatwoot\`)"
+      - "traefik.http.routers.chatwoot.entrypoints=websecure"
+      - "traefik.http.routers.chatwoot.tls.certresolver=myresolver"
+EOF
+
+    # Iniciar o container
+    docker-compose up -d
+
+    echo "Chatwoot instalado com sucesso!"
+    echo "Acesse: https://$dominio_chatwoot"
+}
+
+# Função para instalar N8N
+instalar_n8n() {
+    read -p "Informe o domínio para o N8N (ex: n8n.seudominio.com): " dominio_n8n
+
+    echo "Instalando N8N..."
+
+    # Criar diretório para N8N
+    mkdir -p ~/n8n
+    cd ~/n8n
+
+    # Criar arquivo docker-compose.yml
+    cat > docker-compose.yml <<EOF
+version: '3'
+
+services:
+  n8n:
+    image: n8nio/n8n
+    environment:
+      - "WEBHOOK_URL=https://$dominio_n8n/"
+    ports:
+      - "5678:5678"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.n8n.rule=Host(\`$dominio_n8n\`)"
+      - "traefik.http.routers.n8n.entrypoints=websecure"
+      - "traefik.http.routers.n8n.tls.certresolver=myresolver"
+EOF
+
+    # Iniciar o container
+    docker-compose up -d
+
+    echo "N8N instalado com sucesso!"
+    echo "Acesse: https://$dominio_n8n"
+}
+
+# Função principal
+menu_principal() {
+    while true; do
+        exibir_banner
+        echo "Selecione a aplicação que deseja instalar:"
+        echo "1) Traefik + Portainer"
+        echo "2) Chatwoot"
+        echo "3) N8N"
+        echo "0) Sair"
+        read -p "Opção: " opcao
+
+        case $opcao in
+            1)
+                instalar_traefik_portainer
+                ;;
+            2)
+                instalar_chatwoot
+                ;;
+            3)
+                instalar_n8n
+                ;;
+            0)
+                echo "Saindo..."
+                exit 0
+                ;;
+            *)
+                echo "Opção inválida. Tente novamente."
+                ;;
+        esac
+
+        read -p "Pressione Enter para continuar..."
+    done
+}
+
+# Iniciar o menu principal
+menu_principal
+>>>>>>> fdd2f7a (Versão inicial após reinstalação)

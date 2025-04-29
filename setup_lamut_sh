@@ -1,220 +1,87 @@
 #!/bin/bash
 
-
+clear
+echo "==================================================================================================="
+echo "=                                                                                                 ="
+echo "=        ██╗███╗   ██╗███████╗████████╗ █████╗ ██╗      █████╗ ███╗   ██╗██████╗  ██████╗         ="
+echo "=        ██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██╔══██╗████╗  ██║██╔══██╗██╔═══██╗        ="
+echo "=        ██║██╔██╗ ██║███████╗   ██║   ███████║██║     ███████║██╔██╗ ██║██║  ██║██║   ██║        ="
+echo "=        ██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██╔══██║██║╚██╗██║██║  ██║██║   ██║        ="
+echo "=        ██║██║ ╚████║███████║   ██║   ██║  ██║███████╗██║  ██║██║ ╚████║██████╔╝╚██████╔╝        ="
+echo "=        ╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝  ╚═════╝         ="
+echo "=                                                                                                 ="
+echo "==================================================================================================="
 echo ""
-echo "#########################################"
-echo " Script desenvolvido pela Lamut - www.lamut.com.br"
-echo "#########################################"
+echo "Este auto-instalador foi desenvolvido pela Lamut para facilitar a instalação das principais aplicações open source."
+echo "Licenciado sob a licença MIT."
 echo ""
-
-# Atualizar pacotes e instalar Docker + Docker Compose
-apt update -y && apt upgrade -y
-apt install -y curl wget ufw sudo git docker.io docker-compose
-
-# Ativar e configurar o Firewall
-ufw allow OpenSSH
-ufw allow 80
-ufw allow 443
-ufw --force enable
-
-# Configurar timezone
-timedatectl set-timezone America/Sao_Paulo
-
-# Criar diretório base
-mkdir -p /opt/lamut
-cd /opt/lamut
-
-# Coletar informações interativas
-echo ""
-read -p "Digite seu domínio principal (ex: seudominio.com): " DOMAIN
-read -p "Digite seu e-mail para Let's Encrypt SSL: " EMAIL
-
-echo ""
-echo "Usuário e senha para N8N:"
-read -p "Usuário N8N: " N8N_USER
-read -sp "Senha N8N: " N8N_PASS
+echo "Em caso de dúvidas, envie um e-mail para contato@lamut.com.br"
+echo "Importante: o DNS do domínio que irá utilizar precisa estar apontando para o IP de sua VPS."
 echo ""
 
-echo ""
-echo "Usuário e senha para Grafana:"
-read -p "Usuário Grafana: " GRAFANA_USER
-read -sp "Senha Grafana: " GRAFANA_PASS
-echo ""
+read -p "Ao digitar Y você aceita e concorda com as orientações acima (Y/N): " AGREEMENT
 
-echo ""
-echo "Usuário e senha para Portainer:"
-read -p "Usuário Portainer: " PORTAINER_USER
-read -sp "Senha Portainer: " PORTAINER_PASS
-echo ""
+if [[ "$AGREEMENT" != "Y" && "$AGREEMENT" != "y" ]]; then
+    echo "Você não aceitou os termos. Abortando instalação."
+    exit 1
+fi
 
-echo ""
-echo "Quais aplicações você deseja instalar? (escolha números separados por espaço)"
-echo "1 - Traefik (obrigatório)"
-echo "2 - Chatwoot"
-echo "3 - Evolution API"
-echo "4 - Typebot"
-echo "5 - N8N"
-echo "6 - Flowise AI"
-echo "7 - Botpress"
-echo "8 - Baserow"
-echo "9 - MongoDB"
-echo "10 - Supabase"
-echo "11 - AppSmith"
-read -p "Digite os números (ex: 1 3 5 9): " APPS
+# ========== Funções ==========
 
-# Criar o docker-compose.yml
-cat <<EOF > /opt/lamut/docker-compose.yml
-version: '3.9'
-services:
-EOF
-
-# Sempre incluir Traefik
-cat <<EOF >> /opt/lamut/docker-compose.yml
-  traefik:
-    image: traefik:v2.10
-=======
-# Função para exibir o banner
-exibir_banner() {
+menu_instalacao() {
     clear
     echo "==============================================="
-    echo "       LAMUT - Instalador de Aplicações        "
+    echo "         MENU DE INSTALAÇÃO LAMUT               "
     echo "==============================================="
+    echo "1) Instalar Traefik + Portainer"
+    echo "2) Instalar Chatwoot"
+    echo "3) Instalar N8N"
+    echo "0) Sair"
     echo ""
+    read -p "Escolha uma opção: " opcao
+
+    case $opcao in
+        1) instalar_traefik_portainer ;;
+        2) instalar_chatwoot ;;
+        3) instalar_n8n ;;
+        0) echo "Saindo..."; exit 0 ;;
+        *) echo "Opção inválida."; sleep 2; menu_instalacao ;;
+    esac
 }
 
-# Função para instalar Traefik + Portainer
 instalar_traefik_portainer() {
-    read -p "Informe o domínio para Traefik (ex: traefik.seudominio.com): " dominio_traefik
-    read -p "Informe o e-mail para Let's Encrypt: " email_traefik
+    clear
+    echo "==============================================="
+    echo "Instalando Traefik + Portainer"
+    echo "==============================================="
 
-    echo "Instalando Traefik + Portainer..."
+    read -p "Digite o domínio para Traefik (ex: traefik.exemplo.com): " dominio_traefik
+    read -p "Digite seu e-mail para Let's Encrypt: " email_traefik
 
-    # Criar diretório para Traefik
     mkdir -p ~/traefik
     cd ~/traefik
 
-    # Criar arquivo docker-compose.yml
     cat > docker-compose.yml <<EOF
 version: '3'
 
 services:
   traefik:
     image: traefik:v2.5
->>>>>>> fdd2f7a (Versão inicial após reinstalação)
     command:
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
-<<<<<<< HEAD
-      - "--certificatesresolvers.myresolver.acme.email=$EMAIL"
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
-      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
-=======
       - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
       - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
       - "--certificatesresolvers.myresolver.acme.email=$email_traefik"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
->>>>>>> fdd2f7a (Versão inicial após reinstalação)
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "./letsencrypt:/letsencrypt"
-<<<<<<< HEAD
-    restart: unless-stopped
-EOF
-
-# Função para adicionar serviços escolhidos
-function add_service() {
-    case $1 in
-        2)
-            echo "Adicionando Chatwoot..."
-            mkdir -p /opt/lamut/chatwoot
-            # Configuração Chatwoot
-            ;;
-        3)
-            echo "Adicionando Evolution API..."
-            mkdir -p /opt/lamut/evolution-api
-            cd /opt/lamut/evolution-api
-            git clone https://github.com/EvolutionAPI/evolution-api.git .
-            cp .env.example .env
-            cd /opt/lamut
-            cat <<EOF >> /opt/lamut/docker-compose.yml
-  evolution-api:
-    build: ./evolution-api
-    container_name: evolution-api
-    ports:
-      - "3000:3000"
-    restart: unless-stopped
-EOF
-            ;;
-        4)
-            echo "Adicionando Typebot..."
-            mkdir -p /opt/lamut/typebot
-            ;;
-        5)
-            echo "Adicionando n8n..."
-            mkdir -p /opt/lamut/n8n
-            cat <<EOF >> /opt/lamut/docker-compose.yml
-  n8n:
-    image: n8nio/n8n
-    environment:
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=$N8N_USER
-      - N8N_BASIC_AUTH_PASSWORD=$N8N_PASS
-      - WEBHOOK_TUNNEL_URL=https://n8n.$DOMAIN
-    ports:
-      - "5678:5678"
-    restart: unless-stopped
-EOF
-            ;;
-        6)
-            echo "Adicionando Flowise AI..."
-            mkdir -p /opt/lamut/flowise
-            ;;
-        7)
-            echo "Adicionando Botpress..."
-            mkdir -p /opt/lamut/botpress
-            ;;
-        8)
-            echo "Adicionando Baserow..."
-            mkdir -p /opt/lamut/baserow
-            ;;
-        9)
-            echo "Adicionando MongoDB..."
-            mkdir -p /opt/lamut/mongodb
-            ;;
-        10)
-            echo "Adicionando Supabase..."
-            mkdir -p /opt/lamut/supabase
-            ;;
-        11)
-            echo "Adicionando AppSmith..."
-            mkdir -p /opt/lamut/appsmith
-            ;;
-        *)
-            echo "Opção inválida ou já tratada."
-            ;;
-    esac
-}
-
-# Ler opções escolhidas
-for app in $APPS; do
-  add_service $app
-done
-
-# Subir stack
-docker-compose up -d --build
-
-echo ""
-echo "#########################################"
-echo "Instalação finalizada!"
-echo "Acesse suas aplicações pelos subdomínios configurados."
-echo "Script desenvolvido pela Lamut - www.lamut.com.br"
-echo "#########################################"
-=======
     labels:
       - "traefik.http.routers.api.rule=Host(\`$dominio_traefik\`)"
       - "traefik.http.routers.api.service=api@internal"
@@ -224,6 +91,8 @@ echo "#########################################"
   portainer:
     image: portainer/portainer-ce
     command: -H unix:///var/run/docker.sock
+    ports:
+      - "9000:9000"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "portainer_data:/data"
@@ -237,44 +106,38 @@ volumes:
   portainer_data:
 EOF
 
-    # Criar diretório para certificados
     mkdir -p ~/traefik/letsencrypt
     touch ~/traefik/letsencrypt/acme.json
     chmod 600 ~/traefik/letsencrypt/acme.json
 
-    # Iniciar os containers
     docker-compose up -d
 
-    echo "Traefik e Portainer instalados com sucesso!"
-    echo "Acesse Traefik: https://$dominio_traefik"
-    echo "Acesse Portainer: https://portainer.$dominio_traefik"
+    echo "✅ Traefik e Portainer instalados com sucesso!"
+    echo "🌐 Acesse https://$dominio_traefik para gerenciar certificados."
+    echo "🌐 Acesse https://portainer.$dominio_traefik para gerenciar containers."
+    sleep 5
+    menu_instalacao
 }
 
-# Função para instalar Chatwoot
 instalar_chatwoot() {
-    read -p "Informe o domínio para o Chatwoot (ex: chat.seudominio.com): " dominio_chatwoot
-    read -p "Informe o e-mail do administrador: " email_admin
-    read -p "Informe a senha do administrador: " senha_admin
-    read -p "Informe o nome da empresa: " nome_empresa
+    clear
+    echo "==============================================="
+    echo "Instalando Chatwoot"
+    echo "==============================================="
 
-    echo "Instalando Chatwoot..."
+    read -p "Digite o domínio para o Chatwoot (ex: chat.exemplo.com): " dominio_chatwoot
 
-    # Criar diretório para Chatwoot
     mkdir -p ~/chatwoot
     cd ~/chatwoot
 
-    # Criar arquivo docker-compose.yml
     cat > docker-compose.yml <<EOF
 version: '3'
 
 services:
   chatwoot:
-    image: chatwoot/chatwoot
+    image: chatwoot/chatwoot:latest
     environment:
       - "FRONTEND_URL=https://$dominio_chatwoot"
-      - "ADMIN_EMAIL=$email_admin"
-      - "ADMIN_PASSWORD=$senha_admin"
-      - "ACCOUNT_NAME=$nome_empresa"
     ports:
       - "3000:3000"
     labels:
@@ -284,30 +147,31 @@ services:
       - "traefik.http.routers.chatwoot.tls.certresolver=myresolver"
 EOF
 
-    # Iniciar o container
     docker-compose up -d
 
-    echo "Chatwoot instalado com sucesso!"
-    echo "Acesse: https://$dominio_chatwoot"
+    echo "✅ Chatwoot instalado com sucesso!"
+    echo "🌐 Acesse https://$dominio_chatwoot"
+    sleep 5
+    menu_instalacao
 }
 
-# Função para instalar N8N
 instalar_n8n() {
-    read -p "Informe o domínio para o N8N (ex: n8n.seudominio.com): " dominio_n8n
+    clear
+    echo "==============================================="
+    echo "Instalando N8N"
+    echo "==============================================="
 
-    echo "Instalando N8N..."
+    read -p "Digite o domínio para o N8N (ex: n8n.exemplo.com): " dominio_n8n
 
-    # Criar diretório para N8N
     mkdir -p ~/n8n
     cd ~/n8n
 
-    # Criar arquivo docker-compose.yml
     cat > docker-compose.yml <<EOF
 version: '3'
 
 services:
   n8n:
-    image: n8nio/n8n
+    image: n8nio/n8n:latest
     environment:
       - "WEBHOOK_URL=https://$dominio_n8n/"
     ports:
@@ -319,47 +183,13 @@ services:
       - "traefik.http.routers.n8n.tls.certresolver=myresolver"
 EOF
 
-    # Iniciar o container
     docker-compose up -d
 
-    echo "N8N instalado com sucesso!"
-    echo "Acesse: https://$dominio_n8n"
+    echo "✅ N8N instalado com sucesso!"
+    echo "🌐 Acesse https://$dominio_n8n"
+    sleep 5
+    menu_instalacao
 }
 
-# Função principal
-menu_principal() {
-    while true; do
-        exibir_banner
-        echo "Selecione a aplicação que deseja instalar:"
-        echo "1) Traefik + Portainer"
-        echo "2) Chatwoot"
-        echo "3) N8N"
-        echo "0) Sair"
-        read -p "Opção: " opcao
-
-        case $opcao in
-            1)
-                instalar_traefik_portainer
-                ;;
-            2)
-                instalar_chatwoot
-                ;;
-            3)
-                instalar_n8n
-                ;;
-            0)
-                echo "Saindo..."
-                exit 0
-                ;;
-            *)
-                echo "Opção inválida. Tente novamente."
-                ;;
-        esac
-
-        read -p "Pressione Enter para continuar..."
-    done
-}
-
-# Iniciar o menu principal
-menu_principal
-
+# ========== Iniciar Menu ==========
+menu_instalacao
